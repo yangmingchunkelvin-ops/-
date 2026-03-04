@@ -117,17 +117,16 @@ KEYWORDS = [
 KEYWORDS_LOWER = [k.lower() for k in KEYWORDS]
 
 
-def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
-    """从 RSS 源抓取近 48 小时内的文章，不做关键词过滤，交给 Gemini 判断相关性"""
+def fetch_rss_articles(max_per_feed: int = 8) -> list[dict]:
+    """从 RSS 源抓取近 36 小时内的文章，用关键词做轻量预过滤后交给 Gemini"""
     articles = []
-    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=48)
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=36)
 
     for feed_info in RSS_FEEDS:
         feed_count = 0
         try:
             feed = feedparser.parse(feed_info["url"])
             for entry in feed.entries[:max_per_feed]:
-                # 时间过滤（推特/公众号源有时没有时间，直接收录）
                 pub = None
                 if hasattr(entry, "published_parsed") and entry.published_parsed:
                     pub = datetime.datetime(*entry.published_parsed[:6],
@@ -142,8 +141,15 @@ def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
                 if not title:
                     continue
 
-                # 清理 HTML
-                clean_summary = BeautifulSoup(summary, "html.parser").get_text()[:400]
+                # 轻量关键词预过滤：只过滤明显无关的内容
+                # 推特/公众号源不过滤（source 含 Twitter 或 公众号）
+                is_social = "Twitter" in feed_info["name"] or "公众号" in feed_info["name"]
+                if not is_social:
+                    text = (title + " " + summary).lower()
+                    if not any(kw.lower() in text for kw in KEYWORDS):
+                        continue
+
+                clean_summary = BeautifulSoup(summary, "html.parser").get_text()[:300]
 
                 articles.append({
                     "source":  feed_info["name"],
@@ -154,18 +160,22 @@ def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
                 })
                 feed_count += 1
 
-            print(f"[INFO] {feed_info['name']}: 抓取 {feed_count} 条")
+            print(f"[INFO] {feed_info['name']}: {feed_count} 条")
         except Exception as e:
-            print(f"[WARN] {feed_info['name']} 抓取失败: {e}")
+            print(f"[WARN] {feed_info['name']} 失败: {e}")
 
-    # 去重（按标题）
+    # 去重
     seen, unique = set(), []
     for a in articles:
         if a["title"] not in seen:
             seen.add(a["title"])
             unique.append(a)
 
-    print(f"[INFO] 总计抓取 {len(unique)} 条文章，交给 Gemini 筛选")
+    # 限制总量，避免超时（最多 80 条送给 Gemini）
+    if len(unique) > 80:
+        unique = unique[:80]
+
+    print(f"[INFO] 预过滤后共 {len(unique)} 条，送入 Gemini 精筛")
     return unique
 
 
@@ -213,12 +223,9 @@ def filter_with_thinking(articles: list[dict], client) -> list[dict]:
 只输出 JSON 数组，不要任何解释文字。"""
 
     response = client.models.generate_content(
-        model="gemini-3.1-pro-preview",
+        model="gemini-2.0-flash",
         contents=filter_prompt,
-        config={
-            "thinking_config": {"thinking_level": "high"},
-            "temperature": 0.1,
-        }
+        config={"temperature": 0.1},
     )
 
     # 解析返回的 ID 列表
@@ -282,11 +289,8 @@ def summarize_with_gemini(articles: list[dict]) -> str:
 {articles_text}"""
 
     response = client.models.generate_content(
-        model="gemini-3.1-pro-preview",
+        model="gemini-2.0-flash",
         contents=prompt,
-        config={
-            "thinking_config": {"thinking_level": "medium"},
-        }
     )
     return response.text
 
