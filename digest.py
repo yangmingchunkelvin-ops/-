@@ -118,15 +118,16 @@ KEYWORDS_LOWER = [k.lower() for k in KEYWORDS]
 
 
 def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
-    """从 RSS 源抓取近 48 小时内的相关文章"""
+    """从 RSS 源抓取近 48 小时内的文章，不做关键词过滤，交给 Gemini 判断相关性"""
     articles = []
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=48)
 
     for feed_info in RSS_FEEDS:
+        feed_count = 0
         try:
             feed = feedparser.parse(feed_info["url"])
             for entry in feed.entries[:max_per_feed]:
-                # 时间过滤
+                # 时间过滤（推特/公众号源有时没有时间，直接收录）
                 pub = None
                 if hasattr(entry, "published_parsed") and entry.published_parsed:
                     pub = datetime.datetime(*entry.published_parsed[:6],
@@ -134,25 +135,26 @@ def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
                 if pub and pub < cutoff:
                     continue
 
-                title   = getattr(entry, "title", "")
+                title   = getattr(entry, "title", "").strip()
                 summary = getattr(entry, "summary", "")
                 link    = getattr(entry, "link", "")
 
-                # 关键词过滤
-                text = (title + " " + summary).lower()
-                if not any(kw in text for kw in KEYWORDS_LOWER):
+                if not title:
                     continue
 
                 # 清理 HTML
-                clean_summary = BeautifulSoup(summary, "html.parser").get_text()[:300]
+                clean_summary = BeautifulSoup(summary, "html.parser").get_text()[:400]
 
                 articles.append({
                     "source":  feed_info["name"],
                     "title":   title,
                     "summary": clean_summary,
                     "link":    link,
-                    "date":    pub.strftime("%m-%d %H:%M") if pub else "未知",
+                    "date":    pub.strftime("%m-%d %H:%M") if pub else "最新",
                 })
+                feed_count += 1
+
+            print(f"[INFO] {feed_info['name']}: 抓取 {feed_count} 条")
         except Exception as e:
             print(f"[WARN] {feed_info['name']} 抓取失败: {e}")
 
@@ -163,53 +165,128 @@ def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
             seen.add(a["title"])
             unique.append(a)
 
-    print(f"[INFO] 共抓取 {len(unique)} 条相关文章")
+    print(f"[INFO] 总计抓取 {len(unique)} 条文章，交给 Gemini 筛选")
     return unique
 
 
+def filter_with_thinking(articles: list[dict], client) -> list[dict]:
+    """第一步：用 3.1 Pro 思考模式严格筛选，只保留真正 AI × 营销相关的内容"""
+    if not articles:
+        return []
+
+    articles_json = json.dumps([
+        {"id": i, "source": a["source"], "title": a["title"], "summary": a["summary"][:200]}
+        for i, a in enumerate(articles)
+    ], ensure_ascii=False)
+
+    filter_prompt = f"""你是一位 AI × 广告营销领域的专业编辑，负责对资讯做严格相关性筛选。
+
+以下是 {len(articles)} 条原始文章（JSON 格式），请仔细判断每条是否真正属于「AI × 营销/广告」范畴。
+
+【收录标准 —— 必须同时满足两个条件】
+条件 1：与「营销/广告/品牌/电商增长」有直接关联
+  ✅ 包括：广告投放、创意生产、用户增长、品牌传播、营销自动化、广告平台、电商广告
+  ❌ 排除：纯 AI 技术研究、AI 政策法规、AI 医疗、AI 教育（除非明确提到营销应用场景）
+
+条件 2：与「AI/大模型/自动化技术」有直接关联
+  ✅ 包括：生成式 AI、LLM、机器学习在营销中的应用、AI 工具/产品、自动化投放
+  ❌ 排除：传统数字营销（无 AI 元素）、纯商业新闻（无技术内容）
+
+【典型收录案例】
+✅ Meta 推出 AI 广告创意生成工具
+✅ Google Performance Max 新增 AI 功能
+✅ AI 营销创业公司完成融资
+✅ CMO 谈 AI 在营销中的应用
+✅ TikTok Symphony AI 视频广告新功能
+✅ 巨量引擎 AI 投放能力升级
+
+【典型排除案例】
+❌ OpenAI 发布新版 GPT（纯技术，无营销场景）
+❌ AI 监管政策新闻
+❌ 传统广告公司业绩报告（无 AI 内容）
+❌ 科技公司融资（与营销无关）
+
+原始文章列表：
+{articles_json}
+
+请输出一个 JSON 数组，只包含符合条件的文章 id，例如：[0, 3, 7, 12]
+只输出 JSON 数组，不要任何解释文字。"""
+
+    response = client.models.generate_content(
+        model="gemini-3.1-pro-preview",
+        contents=filter_prompt,
+        config={
+            "thinking_config": {"thinking_level": "high"},
+            "temperature": 0.1,
+        }
+    )
+
+    # 解析返回的 ID 列表
+    try:
+        raw = response.text.strip()
+        # 清理可能的 markdown 代码块
+        raw = raw.replace("```json", "").replace("```", "").strip()
+        selected_ids = json.loads(raw)
+        filtered = [articles[i] for i in selected_ids if i < len(articles)]
+        print(f"[INFO] 思考模式筛选：{len(articles)} → {len(filtered)} 条（AI × 营销相关）")
+        return filtered
+    except Exception as e:
+        print(f"[WARN] 筛选结果解析失败，使用全量文章: {e}")
+        return articles
+
+
 def summarize_with_gemini(articles: list[dict]) -> str:
-    """用 Gemini 对文章做智能摘要和分类"""
+    """第二步：用 3.1 Pro 生成高质量摘要"""
     if not articles:
         return "<p>今日暂无符合条件的 AI × 营销资讯，明天见！</p>"
 
     client = genai.Client(api_key=GEMINI_API_KEY)
 
+    # 先用思考模式筛选
+    filtered_articles = filter_with_thinking(articles, client)
+
+    if not filtered_articles:
+        return "<p>今日暂无符合条件的 AI × 营销资讯，明天见！</p>"
+
     articles_text = "\n\n".join([
         f"【{a['source']}】{a['date']}\n标题: {a['title']}\n摘要: {a['summary']}\n链接: {a['link']}"
-        for a in articles
+        for a in filtered_articles
     ])
 
-    prompt = f"""你是一位专注于 AI × 广告营销领域的资深行业分析师。以下是今日从行业媒体抓取的原始资讯，请筛选并整理成一份高质量简报。
+    prompt = f"""你是一位专注于 AI × 广告营销领域的资深行业分析师。
 
-原始文章列表：
-{articles_text}
+以下是已经过严格筛选的 {len(filtered_articles)} 条 AI × 营销相关资讯，请整理成一份高质量简报。
 
 【输出要求】
-1. 必须输出至少 20 条资讯（如原始文章不足 20 条，可对重要文章做延伸分析补充）
-2. 优先收录：Meta、Google、TikTok、Amazon、Microsoft、Snap 等大厂的 AI 广告产品动态
-3. 优先收录：AI × 广告/营销领域创业公司的融资、产品发布、高管访谈
-4. 每条资讯写 2-3 句中文点评，说清楚"发生了什么"+"为什么重要"
-5. 如有高管原话或关键数据，必须引用
+- 总条数不少于 20 条（如不足 20 条，对重要文章做延伸分析补充）
+- 每条写 2-3 句中文点评：说清楚「发生了什么」+「为什么对营销人重要」
+- 推特内容先翻译原文再点评
+- 如有高管原话或关键数据，必须引用
 
-【分类格式】请按以下 5 个分类输出，每类至少 3 条：
+【分类】按以下 5 类输出，每类至少 3 条：
 
-1. 📊 大厂广告 AI 动态（Meta / Google / TikTok / Amazon 等平台产品更新、功能上线、数据披露）
+1. 📊 大厂广告 AI 动态（Meta / Google / TikTok / Amazon 等平台产品更新）
 2. 🚀 AI 营销创业公司（融资、产品发布、并购、高管变动）
-3. 🎯 AI 创意与投放技术（AI 生成广告素材、动态创意、智能出价、受众定向新技术）
-4. 🗣️ 高管观点与行业访谈（CMO/VP/创始人对 AI 营销的判断、预测、策略分享）
-5. 🌏 中国市场动态（字节、腾讯、阿里、百度等国内平台 AI 广告进展）
+3. 🎯 AI 创意与投放技术（AI 生成广告、动态创意、智能出价新技术）
+4. 🗣️ 大佬观点（推特原文翻译 + 点评、高管访谈摘要）
+5. 🌏 中国市场动态（国内平台 AI 广告进展、公众号精选）
 
-【格式要求】
-- 每条以 ▸ 开头，标题加粗，后接 2-3 句点评，末尾附原文链接
-- 如果某分类今日确实无内容，写"暂无相关动态"
-- 结尾单独写一个「📌 编辑观察」模块：用 3-5 句话点出本周 AI 广告领域最值得关注的结构性趋势
-- 输出纯 HTML（使用 <h3>、<ul>、<li>、<p>、<strong>、<a> 标签），适合邮件渲染
-- 所有链接加 target="_blank"
-- 不要输出 ```html 代码块标记，直接输出 HTML"""
+【格式】
+- 每条以 ▸ 开头，**标题加粗**，后接点评，末尾：<a href="链接" target="_blank">原文链接</a>
+- 某分类无内容时写「暂无」
+- 结尾写 📌 编辑观察：3-5 句话总结今日最值得关注的结构性趋势
+- 输出纯 HTML，使用 <h3><ul><li><p><strong><a> 标签
+- 直接输出 HTML，不要加 ```html 标记
+
+原始资讯：
+{articles_text}"""
 
     response = client.models.generate_content(
-        model="gemini-3.1-flash-lite-preview",
+        model="gemini-3.1-pro-preview",
         contents=prompt,
+        config={
+            "thinking_config": {"thinking_level": "medium"},
+        }
     )
     return response.text
 
