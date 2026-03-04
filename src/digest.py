@@ -134,7 +134,7 @@ def summarize_with_gemini(articles: list[dict]) -> str:
 - 不要输出 ```html 代码块，直接输出 HTML 内容"""
 
     response = client.models.generate_content(
-        model="gemini-2.5-pro-preview-03-25",
+        model="gemini-3.1-flash-lite-preview",
         contents=prompt,
     )
     return response.text
