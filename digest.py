@@ -24,36 +24,103 @@ TODAY = datetime.datetime.now(datetime.timezone.utc).strftime("%Y年%m月%d日")
 
 # ─── RSS 源 ──────────────────────────────────────────────
 RSS_FEEDS = [
-    # AI 行业资讯
-    {"name": "TechCrunch AI",      "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
-    {"name": "The Verge AI",       "url": "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"},
-    {"name": "VentureBeat AI",     "url": "https://venturebeat.com/category/ai/feed/"},
-    {"name": "MIT Tech Review",    "url": "https://www.technologyreview.com/feed/"},
-    # 营销科技
-    {"name": "Marketing Dive",     "url": "https://www.marketingdive.com/feeds/news/"},
-    {"name": "AdExchanger",        "url": "https://www.adexchanger.com/feed/"},
-    {"name": "Martech Alliance",   "url": "https://martechalliance.com/feed/"},
-    # 融资/商业
-    {"name": "Crunchbase News",    "url": "https://news.crunchbase.com/feed/"},
+    # ── 大厂官方博客（最高优先级）──
+    {"name": "Google Ads Blog",         "url": "https://blog.google/products/ads/rss/"},
+    {"name": "Google Marketing Blog",   "url": "https://marketingplatform.google.com/about/blog/feed/"},
+    {"name": "Meta Business Blog",      "url": "https://www.facebook.com/business/news/rss/"},
+    {"name": "Meta AI Blog",            "url": "https://ai.meta.com/blog/rss/"},
+    {"name": "LinkedIn Marketing Blog", "url": "https://business.linkedin.com/marketing-solutions/blog/rss"},
+    {"name": "Microsoft Advertising",   "url": "https://about.ads.microsoft.com/en/blog/rss"},
+    {"name": "TikTok Business Blog",    "url": "https://newsroom.tiktok.com/rss/"},
+    {"name": "Snap Newsroom",           "url": "https://newsroom.snap.com/rss.xml"},
+    {"name": "Amazon Ads Blog",         "url": "https://advertising.amazon.com/blog/rss"},
+    {"name": "Adobe Experience Blog",   "url": "https://business.adobe.com/blog/rss"},
+
+    # ── AI 行业头部媒体 ──
+    {"name": "TechCrunch AI",           "url": "https://techcrunch.com/category/artificial-intelligence/feed/"},
+    {"name": "TechCrunch Marketing",    "url": "https://techcrunch.com/tag/marketing/feed/"},
+    {"name": "The Verge AI",            "url": "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"},
+    {"name": "VentureBeat AI",          "url": "https://venturebeat.com/category/ai/feed/"},
+    {"name": "Wired Business",          "url": "https://www.wired.com/feed/category/business/latest/rss"},
+    {"name": "MIT Tech Review AI",      "url": "https://www.technologyreview.com/feed/"},
+
+    # ── 广告/营销科技专业媒体 ──
+    {"name": "AdExchanger",             "url": "https://www.adexchanger.com/feed/"},
+    {"name": "Digiday",                 "url": "https://digiday.com/feed/"},
+    {"name": "Marketing Dive",          "url": "https://www.marketingdive.com/feeds/news/"},
+    {"name": "AdAge",                   "url": "https://adage.com/rss.xml"},
+    {"name": "AdWeek",                  "url": "https://www.adweek.com/feed/"},
+    {"name": "The Drum",                "url": "https://www.thedrum.com/rss"},
+    {"name": "Martech.org",             "url": "https://martech.org/feed/"},
+    {"name": "Search Engine Land",      "url": "https://searchengineland.com/feed"},
+    {"name": "Social Media Today",      "url": "https://www.socialmediatoday.com/rss/"},
+
+    # ── 推特大V（通过 RSSHub）──
+    {"name": "Twitter-Sam Altman",      "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/sama"},
+    {"name": "Twitter-Zuckerberg",      "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/zuck"},
+    {"name": "Twitter-Sundar Pichai",   "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/sundarpichai"},
+    {"name": "Twitter-Yann LeCun",      "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/ylecun"},
+    {"name": "Twitter-Demis Hassabis",  "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/demishassabis"},
+    {"name": "Twitter-Marketing AI",    "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/marketingaiinst"},
+    {"name": "Twitter-Benedict Evans",  "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/benedictevans"},
+    {"name": "Twitter-Kara Swisher",    "url": "https://rss-hub-iota-ten.vercel.app/twitter/user/karaswisher"},
+
+    # ── 微信公众号（通过 RSSHub）──
+    {"name": "公众号-深响",              "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/deephub"},
+    {"name": "公众号-营销新引擎",         "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/mktengine"},
+    {"name": "公众号-AppGrowing",        "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/appgrowing"},
+    {"name": "公众号-传播体操",           "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/chuanboticao"},
+    {"name": "公众号-剁椒TMT",           "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/duojiaotmt"},
+    {"name": "公众号-科技新知",           "url": "https://rss-hub-iota-ten.vercel.app/wechat/wemp/kejixinzhi"},
+    {"name": "Crunchbase News",         "url": "https://news.crunchbase.com/feed/"},
+    {"name": "TechCrunch Startups",     "url": "https://techcrunch.com/category/startups/feed/"},
 ]
 
-# 关键词过滤（命中至少一个才收录）
+# 关键词过滤 —— 命中任意一个即收录
 KEYWORDS = [
-    "AI marketing", "artificial intelligence marketing", "generative AI", "gen AI",
-    "marketing AI", "ad tech", "adtech", "martech", "marketing technology",
-    "AI advertising", "programmatic", "creative AI", "content AI",
-    "marketing automation", "AI campaign", "brand AI",
-    "funding", "raises", "Series", "investment", "million",  # 融资相关
-    "OpenAI", "Anthropic", "Google AI", "Meta AI", "Adobe AI",
+    # 核心主题
+    "AI marketing", "AI advertising", "AI ad", "AI-powered ad",
+    "generative AI", "gen AI", "genAI", "LLM advertising",
+    "marketing AI", "ad tech AI", "adtech AI", "martech AI",
+    "creative AI", "AI creative", "AI campaign", "AI targeting",
+    "AI personalization", "AI audience", "AI bidding", "AI optimization",
+    "programmatic AI", "AI media buying", "AI copywriting",
+    "AI video ad", "AI image ad", "AI content marketing",
+
+    # 大厂产品关键词
+    "Performance Max", "Advantage+", "Smart Bidding", "Demand Gen",
+    "Google Ads AI", "Meta AI", "Meta Advantage", "TikTok Symphony",
+    "Amazon DSP", "Microsoft Advertising AI", "LinkedIn AI",
+    "Snap AI", "Pinterest AI", "YouTube AI",
+
+    # AI 营销创业公司常见词
+    "ad generation", "creative automation", "dynamic creative",
+    "AI influencer", "virtual influencer", "synthetic media",
+    "brand safety AI", "attribution AI", "ad measurement AI",
+
+    # 大厂高管/观点
+    "Mark Zuckerberg", "Sundar Pichai", "Yann LeCun",
+    "chief marketing officer", "CMO", "VP of Marketing",
+
+    # 融资信号
+    "raises", "funding", "Series A", "Series B", "Series C",
+    "million", "billion", "valuation", "backed by", "investment",
+    "acquires", "acquisition", "merger",
+    # 中文关键词（公众号内容）
+    "AI广告", "AI营销", "人工智能营销", "智能投放", "程序化广告",
+    "大模型营销", "AIGC营销", "生成式AI", "AI创意", "智能创意",
+    "巨量引擎", "磁力引擎", "腾讯广告", "阿里妈妈", "百度营销",
+    "Meta广告", "谷歌广告", "TikTok广告", "出海营销",
+    "融资", "亿元", "千万", "完成融资", "获投",
 ]
 
 KEYWORDS_LOWER = [k.lower() for k in KEYWORDS]
 
 
-def fetch_rss_articles(max_per_feed: int = 8) -> list[dict]:
-    """从 RSS 源抓取近 24 小时内的相关文章"""
+def fetch_rss_articles(max_per_feed: int = 15) -> list[dict]:
+    """从 RSS 源抓取近 48 小时内的相关文章"""
     articles = []
-    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=28)
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=48)
 
     for feed_info in RSS_FEEDS:
         try:
@@ -112,29 +179,36 @@ def summarize_with_gemini(articles: list[dict]) -> str:
         for a in articles
     ])
 
-    prompt = f"""你是一位专注于 AI × 营销领域的资深分析师，请对以下今日抓取的资讯进行整理和点评。
+    prompt = f"""你是一位专注于 AI × 广告营销领域的资深行业分析师。以下是今日从行业媒体抓取的原始资讯，请筛选并整理成一份高质量简报。
 
 原始文章列表：
 {articles_text}
 
-请按以下分类整理，每条资讯用中文写1-2句核心要点，并在末尾附上原文链接。
-分类：
-1. 🚀 AI 营销融资动态（初创公司融资、并购）
-2. 🤖 AI × 营销新玩法（产品功能、营销案例、创意技术）
-3. 🐦 行业大佬观点（科技/营销领域 KOL 的关键判断）
-4. 📊 平台与工具动态（Meta、Google、TikTok 等广告平台 AI 能力更新）
-5. 🌏 中国市场动态（国内 AI 营销相关）
+【输出要求】
+1. 必须输出至少 20 条资讯（如原始文章不足 20 条，可对重要文章做延伸分析补充）
+2. 优先收录：Meta、Google、TikTok、Amazon、Microsoft、Snap 等大厂的 AI 广告产品动态
+3. 优先收录：AI × 广告/营销领域创业公司的融资、产品发布、高管访谈
+4. 每条资讯写 2-3 句中文点评，说清楚"发生了什么"+"为什么重要"
+5. 如有高管原话或关键数据，必须引用
 
-要求：
-- 每条用一个 emoji 点（▸）开头
-- 如果某分类今日无内容，请跳过该分类
-- 结尾用2-3句话写「今日编辑观察」，点出最值得关注的趋势
-- 输出格式为 HTML（用 <h3>、<ul>、<li>、<p>、<a> 标签），适合邮件展示
-- 链接用 target="_blank" 打开新标签页
-- 不要输出 ```html 代码块，直接输出 HTML 内容"""
+【分类格式】请按以下 5 个分类输出，每类至少 3 条：
+
+1. 📊 大厂广告 AI 动态（Meta / Google / TikTok / Amazon 等平台产品更新、功能上线、数据披露）
+2. 🚀 AI 营销创业公司（融资、产品发布、并购、高管变动）
+3. 🎯 AI 创意与投放技术（AI 生成广告素材、动态创意、智能出价、受众定向新技术）
+4. 🗣️ 高管观点与行业访谈（CMO/VP/创始人对 AI 营销的判断、预测、策略分享）
+5. 🌏 中国市场动态（字节、腾讯、阿里、百度等国内平台 AI 广告进展）
+
+【格式要求】
+- 每条以 ▸ 开头，标题加粗，后接 2-3 句点评，末尾附原文链接
+- 如果某分类今日确实无内容，写"暂无相关动态"
+- 结尾单独写一个「📌 编辑观察」模块：用 3-5 句话点出本周 AI 广告领域最值得关注的结构性趋势
+- 输出纯 HTML（使用 <h3>、<ul>、<li>、<p>、<strong>、<a> 标签），适合邮件渲染
+- 所有链接加 target="_blank"
+- 不要输出 ```html 代码块标记，直接输出 HTML"""
 
     response = client.models.generate_content(
-        model="gemini-2.5-pro-preview-03-25",
+        model="gemini-3.1-flash-lite-preview",
         contents=prompt,
     )
     return response.text
